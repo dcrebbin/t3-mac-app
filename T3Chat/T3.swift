@@ -6,7 +6,7 @@ struct T3 {
 /// Returns a tuple containing arrays of ConversationThread and ConversationMessage, or nil if none found.
 func getConversationThreads(from histories: [ConversationHistory]) -> (threads: [ConversationThread], messages: [ConversationMessage])? {
     var retrievedThreads: [ConversationThread] = []
-    var messages: [ConversationMessage] = []
+    var retrievedMessages: [ConversationMessage] = []
     
     for history in histories {
         switch history.json {
@@ -26,7 +26,7 @@ func getConversationThreads(from histories: [ConversationHistory]) -> (threads: 
                             // Try to decode as a message
                             if let jsonData = try? JSONSerialization.data(withJSONObject: dict),
                                let message = try? JSONDecoder().decode(ConversationMessage.self, from: jsonData) {
-                                messages.append(message)
+                                retrievedMessages.append(message)
                             }
                             
                         }
@@ -44,9 +44,36 @@ func getConversationThreads(from histories: [ConversationHistory]) -> (threads: 
                         // Handle array case with "messages" or "threads" as first element
                         if let nestedValueArray = nestedItem.value as? [T3_Chat.AnyCodable],
                            let firstElement = nestedValueArray.first?.value as? [String: AnyCodable] {
-                            /*
-                                firstElement: ["threads": T3_Chat.AnyCodable(value: [T3_Chat.AnyCodable(value: ["last_message_at": T3_Chat.AnyCodable(value: "2025-01-12T10:39:41.108Z"), "status": T3_Chat.AnyCodable(value: "done"), "user_edited_title": T3_Chat.AnyCodable(value: false), "updated_at": T3_Chat.AnyCodable(value: "2025-01-12T10:39:41.108Z"), "model": T3_Chat.AnyCodable(value: "gpt-4o-mini"), "created_at": T3_Chat.AnyCodable(value: "2025-01-12T10:39:41.054Z"), "id": T3_Chat.AnyCodable(value: "d3ff6609-e655-4150-9aa8-5e0551ac80a9"), "title": T3_Chat.AnyCodable(value: "New Thread")]), T3_Chat.AnyCodable(value: ["created_at": T3_Chat.AnyCodable(value: "2025-01-12T17:48:46.173Z"), "user_edited_title": T3_Chat.AnyCodable(value: false), "id": T3_Chat.AnyCodable(value: "d7893cb5-8875-4272-9e44-a1f6cd6ca782"), "model": T3_Chat.AnyCodable(value: "gpt-4o-mini"), "title": T3_Chat.AnyCodable(value: ""), "status": T3_Chat.AnyCodable(value: "deleted"), "last_message_at": T3_Chat.AnyCodable(value: "2025-01-12T17:48:46.241Z"), 
-                            */
+                        
+                               if let messages = firstElement["messages"]?.value as? [T3_Chat.AnyCodable] {
+                                for message in messages {
+                                    if let messageData = message.value as? [String: AnyCodable] {
+                                        print("messageData: \(messageData)")
+                                        do {
+                                            // Convert AnyCodable values to plain JSON-compatible values
+                                            var jsonCompatibleData: [String: Any] = [:]
+                                            for (key, value) in messageData {
+                                                if let anyValue = value.value as? String {
+                                                    jsonCompatibleData[key] = anyValue
+                                                } else if let anyValue = value.value as? Bool {
+                                                    jsonCompatibleData[key] = anyValue
+                                                } else if let anyValue = value.value as? Int {
+                                                    jsonCompatibleData[key] = anyValue
+                                                } else if let anyValue = value.value as? Double {
+                                                    jsonCompatibleData[key] = anyValue
+                                                }
+                                            }
+                                            
+                                            let jsonData = try JSONSerialization.data(withJSONObject: jsonCompatibleData)
+                                            let retrievedMessage = try JSONDecoder().decode(ConversationMessage.self, from: jsonData)
+                                            retrievedMessages.append(retrievedMessage)
+                                        } catch {
+                                            print("Error processing message data: \(error)")
+                                            print("Failed message data: \(messageData)")
+                                        }
+                                    }
+                                }
+                            }
                             
                             if let threads = firstElement["threads"]?.value as? [T3_Chat.AnyCodable] {
                                 for thread in threads {
@@ -84,8 +111,8 @@ func getConversationThreads(from histories: [ConversationHistory]) -> (threads: 
         }
     }
     
-    print("Found \(retrievedThreads.count) threads and \(messages.count) messages")
-    return (retrievedThreads.isEmpty && messages.isEmpty) ? nil : (retrievedThreads, messages)
+    print("Found \(retrievedThreads.count) threads and \(retrievedMessages.count) messages")
+    return (retrievedThreads.isEmpty && retrievedMessages.isEmpty) ? nil : (retrievedThreads, retrievedMessages)
 }
 
 static func retrieveChatHistory() async -> (threads: [ConversationThread], messages: [ConversationMessage])? {
@@ -139,7 +166,14 @@ static func retrieveChatHistory() async -> (threads: [ConversationThread], messa
         
         print("Found \(histories.count) conversation histories")
         let t3 = T3()
-        return t3.getConversationThreads(from: histories)
+        let (threads, messages) = t3.getConversationThreads(from: histories) ?? ([], [])
+        let jsonEncoder = JSONEncoder()
+        jsonEncoder.outputFormatting = .prettyPrinted
+        let threadsJson = try! jsonEncoder.encode(threads)
+        let messagesJson = try! jsonEncoder.encode(messages)
+        ApplicationState.conversationThreads =  threadsJson.base64EncodedString()
+        ApplicationState.conversationMessages = messagesJson.base64EncodedString()
+        return (threads, messages)
     } catch {
         print("Error retrieving chat history: \(error)")
         return nil

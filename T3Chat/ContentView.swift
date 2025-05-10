@@ -20,7 +20,7 @@ struct ContentView: View {
   @State public var errorText: String?
   @State private var isHoveringClearButton: Bool = false
   @State private var isHoveringRetrieveLatestChatButton: Bool = false
-
+  @State private var selectedThread: ConversationThread?
 
   func userMessage(message: AppMessage) -> some View {
     let containsChinese =
@@ -163,10 +163,32 @@ struct ContentView: View {
 
   @State public var threads: [ConversationThread] = []
   @State public var messages: [ConversationMessage] = []
-
+  @State private var newMessage: String = ""
+  func messagesView(threadId: String) -> some View {
+      let messages = messages.filter { $0.threadId == threadId }
+      let thread = threads.first { $0.id == threadId }
+      return VStack(alignment: .leading, spacing: 0) {
+        Text(thread?.title ?? "")
+          .font(.headline)
+          .padding(.bottom, 10)
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 0) {
+              ForEach(messages, id: \.id) { message in
+                Text(.init(Constants.convertStringToMarkdown(message: message.content)))
+                  .font(.body)
+                  .padding(.bottom, 10)
+              }
+          }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        TextField("New message", text: $newMessage)
+          .textFieldStyle(RoundedBorderTextFieldStyle())
+          .padding(.bottom, 10)
+      }
+  }
+  
   var threadsView: some View {
     ForEach(threads, id: \.id) { thread in
-      Text(thread.id).tabItem {
+      messagesView(threadId: thread.id).tabItem {
         Text(thread.title)
       }
     }
@@ -180,7 +202,7 @@ struct ContentView: View {
       VStack(alignment: .leading, spacing: 0) {
         TabView {
             VStack(alignment: .leading) {
-            MessageView(errorText: $errorText, threads: $threads, messages: $messages)
+            MessageView(errorText: $errorText, selectedThread: $selectedThread, threads: $threads, messages: $messages)
             if let errorText = errorText {
               Text(errorText)
                 .foregroundColor(.red)
@@ -196,6 +218,17 @@ struct ContentView: View {
           threadsView
         }.tabViewStyle(.sidebarAdaptable).frame(maxWidth: .infinity, maxHeight: .infinity)
           .edgesIgnoringSafeArea(.all).padding(.all, 0)
+      }.onAppear {
+        if ApplicationState.conversationThreads.count > 0 && ApplicationState.conversationMessages.count > 0 && threads.count == 0 && messages.count == 0 {
+          print("ApplicationState.conversationThreads: \(ApplicationState.conversationThreads)")
+          print("ApplicationState.conversationMessages: \(ApplicationState.conversationMessages)")
+          let threadsData = Data(base64Encoded: ApplicationState.conversationThreads)
+          let messagesData = Data(base64Encoded: ApplicationState.conversationMessages)
+          let decoder = JSONDecoder()
+          decoder.dateDecodingStrategy = .iso8601
+          threads = try! decoder.decode([ConversationThread].self, from: threadsData ?? Data())
+          messages = try! decoder.decode([ConversationMessage].self, from: messagesData ?? Data())
+        }
       }
       .frame(maxWidth: .infinity, minHeight: 250, maxHeight: .infinity,alignment: .top)
     }
@@ -212,7 +245,7 @@ struct MessageView: View {
 
   @State var isRetrievingChatHistory: Bool = false
   @State var isHoveringRetrieveLatestChatButton: Bool = false
-
+  @Binding var selectedThread: ConversationThread?
   @Binding var threads: [ConversationThread]
   @Binding var messages: [ConversationMessage]
 
@@ -267,51 +300,6 @@ struct MessageView: View {
         .buttonStyle(.borderless)
       }
       .frame(maxWidth: .infinity, minHeight: 60)
-      
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-          Text("Did you notice how fast that was?")
-            .font(.system(size: 16))
-            .padding(.all, 10)
-            .fontWeight(.bold)
-            Text("Um but it's not that fast bc this is a prototype : )")
-              .font(.system(size: 14))
-              .padding(.all, 10)
-        }
-      }
-      // if !threads.isEmpty {
-      //   List(threads, id: \.id) { thread in
-      //     VStack(alignment: .leading) {
-      //       Text(thread.title)
-      //         .font(.headline)
-      //       Text("Created: \(thread.created_at)")
-      //         .font(.caption)
-      //       if let lastMessage = thread.last_message_at {
-      //         Text("Last message: \(lastMessage)")
-      //           .font(.caption)
-      //       }
-      //     }
-      //     .padding(.vertical, 4)
-      //   }
-      // }
-      
-      // if !messages.isEmpty {
-      //   List(messages, id: \.id) { message in
-      //     VStack(alignment: .leading) {
-      //       Text(message.role)
-      //         .font(.caption)
-      //         .foregroundColor(.gray)
-      //       Text(message.content)
-      //         .font(.body)
-      //       if let createdAt = message.created_at {
-      //         Text("Created: \(createdAt)")
-      //           .font(.caption)
-      //           .foregroundColor(.gray)
-      //       }
-      //     }
-      //     .padding(.vertical, 4)
-      //   }
-      // }
     }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 }
