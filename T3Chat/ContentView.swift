@@ -246,13 +246,14 @@ struct ContentView: View {
               }
             }
           }
-          .padding(.top, 10)
-           .padding(.horizontal, 10)
+          .padding(.horizontal, 10)
+          .frame(height:60)
           .textFieldStyle(PlainTextFieldStyle())
           .border(Color.white.opacity(0.2), width: 1)
           .background(
             .ultraThinMaterial
           )
+
           .clipShape(.rect(topLeadingRadius: 10, topTrailingRadius: 10))
 
       }
