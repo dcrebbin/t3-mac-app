@@ -127,7 +127,7 @@ struct ConversationMessage: Codable {
     let role: String
     let model: String
     let status: String
-    let content: String
+    var content: String
     let threadId: String?
     let created_at: String?
     let modelParams: [String: String]?
@@ -137,6 +137,20 @@ struct ConversationMessage: Codable {
     
     enum CodingKeys: String, CodingKey {
         case id, role, model, status, content, threadId, created_at, modelParams, attachments, providerMetadata, errorReason
+    }
+
+    init(id: String, role: String, model: String, status: String, content: String, threadId: String?, created_at: String?, modelParams: [String: String]?, attachments: [AnyCodable]?, providerMetadata: ProviderMetadata?, errorReason: String?) {
+        self.id = id
+        self.role = role
+        self.model = model
+        self.status = status
+        self.content = content
+        self.threadId = threadId
+        self.created_at = created_at
+        self.modelParams = modelParams
+        self.attachments = attachments
+        self.providerMetadata = providerMetadata
+        self.errorReason = errorReason
     }
     
     init(from decoder: Decoder) throws {

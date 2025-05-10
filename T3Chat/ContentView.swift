@@ -163,10 +163,10 @@ struct ContentView: View {
 
   @State public var threads: [ConversationThread] = []
   @State public var messages: [ConversationMessage] = []
-  @State private var newMessage: String = ""
+  @State private var textInput: String = ""
   func messagesView(threadId: String) -> some View {
-      let messages = messages.filter { $0.threadId == threadId }
-      let sortedMessages = messages.sorted { 
+      let filteredMessages = messages.filter { $0.threadId == threadId }
+      let sortedMessages = filteredMessages.sorted {
           if let date0 = $0.created_at, let date1 = $1.created_at {
           return date0 < date1
         }
@@ -177,6 +177,7 @@ struct ContentView: View {
         Text(thread?.title ?? "")
           .font(.headline)
           .padding(.bottom, 10)
+      ZStack(alignment: .bottom) {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0) {
               ForEach(sortedMessages, id: \.id) { message in
@@ -192,15 +193,70 @@ struct ContentView: View {
                 } else {
                   Text(.init(Constants.convertStringToMarkdown(message: message.content)))
                     .font(.body)
-                    .padding(.bottom, 10)
+                    .padding(.top, 10)
                     .textSelection(.enabled)
                 }
               }
           }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        TextField("New message", text: $newMessage)
-          .textFieldStyle(RoundedBorderTextFieldStyle())
-          .padding(.bottom, 10)
+        ZStack (alignment: .bottom) {
+        TextField("",text: $textInput)
+          .onSubmit {
+            Task {
+              print("newMessage: \(textInput)")
+             
+              let newMessage = ConversationMessage(
+                id: UUID().uuidString,
+                role: "user",
+                model: "gemini-2.5-flash",
+                status: threadId,
+                content: textInput,
+                threadId: threadId,
+                created_at: Date().ISO8601Format(),
+                modelParams: ["reasoningEffort": "medium"],
+                attachments: nil,
+                providerMetadata: nil,
+                errorReason: ""
+              )
+              messages.append(newMessage)
+              let responseMessage = ConversationMessage(
+                id: UUID().uuidString,
+                role: "assistant", 
+                model: "gemini-2.5-flash",
+                status: threadId,
+                content: "",
+                threadId: threadId,
+                created_at: Date().ISO8601Format(),
+                modelParams: ["reasoningEffort": "medium"],
+                attachments: nil,
+                providerMetadata: nil,
+                errorReason: ""
+              )
+              
+              messages.append(responseMessage)
+              
+              let stream = await T3.sendMessage(message: textInput)
+              textInput = ""
+              
+              for try await content in stream {
+                print("received content: \(content)")
+                if let index = messages.firstIndex(where: { $0.id == responseMessage.id }) {
+                  messages[index].content = messages[index].content + content
+                }
+              }
+            }
+          }
+          .padding(.top, 10)
+           .padding(.horizontal, 10)
+          .textFieldStyle(PlainTextFieldStyle())
+          .border(Color.white.opacity(0.2), width: 1)
+          .background(
+            .ultraThinMaterial
+          )
+          .clipShape(.rect(topLeadingRadius: 10, topTrailingRadius: 10))
+
+      }
+        }
       }
   }
   
@@ -208,7 +264,8 @@ struct ContentView: View {
     ForEach(threads, id: \.id) { thread in
       messagesView(threadId: thread.id).tabItem {
         Text(thread.title)
-      }.padding(.all, 10)
+      }.padding(.top, 10)
+      .padding(.horizontal, 10)
     }
   }
 

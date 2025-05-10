@@ -179,4 +179,86 @@ static func retrieveChatHistory() async -> (threads: [ConversationThread], messa
         return nil
     }
 }
+
+static func sendMessage(message: String) async -> AsyncThrowingStream<String, Error> {
+    return AsyncThrowingStream { continuation in
+        Task {
+            do {
+                guard ApplicationState.authToken != "" else {
+                    continuation.finish(throwing: NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No auth token"]))
+                    return
+                }
+
+                let url = URL(string: "https://t3.chat/api/chat")!
+
+                let headers = [
+                    "Content-Type": "application/json",
+                    "Cookie": ApplicationState.authToken,
+                ]
+
+                let body = [
+                    "messages": [
+                        [
+                            "role": "user",
+                            "content": message,
+                            "attachments": [],
+                            "id": UUID().uuidString
+                        ]
+                    ],
+                    "model": "gemini-2.5-flash",
+                    "modelParams": [
+                        "reasoningEffort": "medium",
+                        "includeSearch": false
+                    ],
+                    "threadMetadata": [
+                        "id":  "",
+                        "title": ""
+                    ],
+                    "preferences": [
+                        "name": "",
+                        "occupation": "",
+                        "selectedTraits": "",
+                        "additionalInfo": ""
+                    ],
+                    "userInfo": [
+                        "timezone": "Asia/Shanghai"
+                    ]
+                ] as [String: Any]
+
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.allHTTPHeaderFields = headers
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
+                    print("Error: \(httpResponse.statusCode)")
+                    print("Error: \(data)")
+                    continuation.finish(throwing: NSError(domain: "", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Unauthorized"]))
+                    return
+                }
+
+                guard let responseString = String(data: data, encoding: .utf8) else {
+                    print("Error: Could not convert data to string")
+                    continuation.finish(throwing: NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response encoding"]))
+                    return
+                }
+
+                // Process each line of the response
+                for line in responseString.components(separatedBy: .newlines) {
+                    if line.hasPrefix("0:") {
+                        let content = line.replacingOccurrences(of: "0:", with: "").replacingOccurrences(of: "\"", with: "")
+                        print("content: \(content)")
+                        continuation.yield(content)
+                    }
+                }
+                
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+    }
+}
 }
