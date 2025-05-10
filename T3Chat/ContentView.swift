@@ -12,13 +12,15 @@ struct AppMessage {
 }
 
 struct ContentView: View {
-  @State private var messages: [AppMessage] = []
   @State private var isListening: Bool = false
   @State private var messageIds: [String] = []
   @State private var conversationId: String = ""
   @State private var conversationTitle: String = ""
   @State private var scrollProxy: ScrollViewProxy?
   @State public var errorText: String?
+  @State private var isHoveringClearButton: Bool = false
+  @State private var isHoveringRetrieveLatestChatButton: Bool = false
+
 
   func userMessage(message: AppMessage) -> some View {
     let containsChinese =
@@ -124,8 +126,6 @@ struct ContentView: View {
 
   }
 
-
-
   func logError(error: Error?) {
     print("Error: \(error?.localizedDescription ?? "Unknown error")")
     errorText = "Error: \(error?.localizedDescription ?? "Unknown error")"
@@ -133,9 +133,6 @@ struct ContentView: View {
       errorText = nil
     }
   }
-
-  @State private var isHoveringClearButton: Bool = false
-  @State private var isHoveringRetrieveLatestChatButton: Bool = false
 
   var clear: some View {
     HStack {
@@ -164,6 +161,17 @@ struct ContentView: View {
     }
   }
 
+  @State public var threads: [ConversationThread] = []
+  @State public var messages: [ConversationMessage] = []
+
+  var threadsView: some View {
+    ForEach(threads, id: \.id) { thread in
+      Text(thread.id).tabItem {
+        Text(thread.title)
+      }
+    }
+  }
+
   var body: some View {
     ZStack(alignment: .top) {
       TranslucentView(material: .hudWindow)
@@ -172,16 +180,7 @@ struct ContentView: View {
       VStack(alignment: .leading, spacing: 0) {
         TabView {
             VStack(alignment: .leading) {
-            MessageView(errorText: $errorText)
-            if !conversationId.isEmpty {
-              VStack(alignment: .leading) {
-                Text("ID").font(.system(size: 12)).bold()
-                Text(conversationId).padding(.bottom, 2).textSelection(.enabled)
-                Text("Title").font(.system(size: 12)).bold()
-                Text(conversationTitle).textSelection(.enabled)
-              }.padding(.all, 2)
-              Divider()
-            }
+            MessageView(errorText: $errorText, threads: $threads, messages: $messages)
             if let errorText = errorText {
               Text(errorText)
                 .foregroundColor(.red)
@@ -192,11 +191,9 @@ struct ContentView: View {
           }
           .background(Color(.clear))
           .tabItem {
-            Label("Conversation", systemImage: "message")
+            Text("This is a test")
           }
-          Settings().tabItem {
-            Label("Settings", systemImage: "gear")
-          }
+          threadsView
         }.tabViewStyle(.sidebarAdaptable).frame(maxWidth: .infinity, maxHeight: .infinity)
           .edgesIgnoringSafeArea(.all).padding(.all, 0)
       }
@@ -215,8 +212,9 @@ struct MessageView: View {
 
   @State var isRetrievingChatHistory: Bool = false
   @State var isHoveringRetrieveLatestChatButton: Bool = false
-  @State private var threads: [ConversationThread] = []
-  @State private var messages: [ConversationMessage] = []
+
+  @Binding var threads: [ConversationThread]
+  @Binding var messages: [ConversationMessage]
 
   func retrieveChatHistory() async {
     print("Retrieving chat history")
@@ -231,7 +229,7 @@ struct MessageView: View {
 
   var body: some View {
     VStack {
-      HStack(alignment: .top) {
+      HStack(alignment: .center) {
         Text("Retrieve chat history").padding(.leading, 10)
         Button(action: {
           Task {
@@ -241,11 +239,18 @@ struct MessageView: View {
           }
         }) {
           Image(
-            systemName: isRetrievingChatHistory ? "clock.fill" : "clock"
+            systemName:"arrow.clockwise"
           )
-          .font(.system(size: 20))
+          .font(.system(size: 15))
           .scaledToFit()
           .padding(.all, 4)
+          .rotationEffect(.degrees(isRetrievingChatHistory ? 360 : 0))
+          .animation(
+            isRetrievingChatHistory ? 
+              Animation.linear(duration: 1).repeatForever(autoreverses: false) : 
+              .default,
+            value: isRetrievingChatHistory
+          )
         }
         .background(
           isHoveringRetrieveLatestChatButton
@@ -261,41 +266,52 @@ struct MessageView: View {
         }
         .buttonStyle(.borderless)
       }
-      .frame(maxWidth: .infinity, minHeight: 40)
+      .frame(maxWidth: .infinity, minHeight: 60)
       
-      if !threads.isEmpty {
-        List(threads, id: \.id) { thread in
-          VStack(alignment: .leading) {
-            Text(thread.title)
-              .font(.headline)
-            Text("Created: \(thread.created_at)")
-              .font(.caption)
-            if let lastMessage = thread.last_message_at {
-              Text("Last message: \(lastMessage)")
-                .font(.caption)
-            }
-          }
-          .padding(.vertical, 4)
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          Text("Did you notice how fast that was?")
+            .font(.system(size: 16))
+            .padding(.all, 10)
+            .fontWeight(.bold)
+            Text("Um but it's not that fast bc this is a prototype : )")
+              .font(.system(size: 14))
+              .padding(.all, 10)
         }
       }
+      // if !threads.isEmpty {
+      //   List(threads, id: \.id) { thread in
+      //     VStack(alignment: .leading) {
+      //       Text(thread.title)
+      //         .font(.headline)
+      //       Text("Created: \(thread.created_at)")
+      //         .font(.caption)
+      //       if let lastMessage = thread.last_message_at {
+      //         Text("Last message: \(lastMessage)")
+      //           .font(.caption)
+      //       }
+      //     }
+      //     .padding(.vertical, 4)
+      //   }
+      // }
       
-      if !messages.isEmpty {
-        List(messages, id: \.id) { message in
-          VStack(alignment: .leading) {
-            Text(message.role)
-              .font(.caption)
-              .foregroundColor(.gray)
-            Text(message.content)
-              .font(.body)
-            if let createdAt = message.created_at {
-              Text("Created: \(createdAt)")
-                .font(.caption)
-                .foregroundColor(.gray)
-            }
-          }
-          .padding(.vertical, 4)
-        }
-      }
-    }
+      // if !messages.isEmpty {
+      //   List(messages, id: \.id) { message in
+      //     VStack(alignment: .leading) {
+      //       Text(message.role)
+      //         .font(.caption)
+      //         .foregroundColor(.gray)
+      //       Text(message.content)
+      //         .font(.body)
+      //       if let createdAt = message.created_at {
+      //         Text("Created: \(createdAt)")
+      //           .font(.caption)
+      //           .foregroundColor(.gray)
+      //       }
+      //     }
+      //     .padding(.vertical, 4)
+      //   }
+      // }
+    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 }
