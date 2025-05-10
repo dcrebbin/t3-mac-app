@@ -166,6 +166,12 @@ struct ContentView: View {
   @State private var newMessage: String = ""
   func messagesView(threadId: String) -> some View {
       let messages = messages.filter { $0.threadId == threadId }
+      let sortedMessages = messages.sorted { 
+          if let date0 = $0.created_at, let date1 = $1.created_at {
+          return date0 < date1
+        }
+        return false
+      }
       let thread = threads.first { $0.id == threadId }
       return VStack(alignment: .leading, spacing: 0) {
         Text(thread?.title ?? "")
@@ -173,10 +179,22 @@ struct ContentView: View {
           .padding(.bottom, 10)
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0) {
-              ForEach(messages, id: \.id) { message in
-                Text(.init(Constants.convertStringToMarkdown(message: message.content)))
-                  .font(.body)
-                  .padding(.bottom, 10)
+              ForEach(sortedMessages, id: \.id) { message in
+                if message.role == "user" {
+                  VStack(alignment: .trailing) {
+                  Text(.init(Constants.convertStringToMarkdown(message: message.content)))
+                    .font(.body)
+                    .textSelection(.enabled)
+                    .padding(.all, 10)
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                  }.frame(maxWidth: .infinity, alignment: .trailing).padding(.bottom, 10)
+                } else {
+                  Text(.init(Constants.convertStringToMarkdown(message: message.content)))
+                    .font(.body)
+                    .padding(.bottom, 10)
+                    .textSelection(.enabled)
+                }
               }
           }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -190,7 +208,7 @@ struct ContentView: View {
     ForEach(threads, id: \.id) { thread in
       messagesView(threadId: thread.id).tabItem {
         Text(thread.title)
-      }
+      }.padding(.all, 10)
     }
   }
 
