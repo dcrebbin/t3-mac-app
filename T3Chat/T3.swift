@@ -180,7 +180,7 @@ static func retrieveChatHistory() async -> (threads: [ConversationThread], messa
     }
 }
 
-static func sendMessage(message: String) async -> AsyncThrowingStream<String, Error> {
+static func sendMessage(messages: [ChatMessage], threadId: String, title: String) async -> AsyncThrowingStream<String, Error> {
     return AsyncThrowingStream { continuation in
         Task {
             do {
@@ -195,24 +195,28 @@ static func sendMessage(message: String) async -> AsyncThrowingStream<String, Er
                     "Content-Type": "application/json",
                     "Cookie": ApplicationState.authToken,
                 ]
+                let messagesJson = messages.map { message -> [String: Any] in
+                    var json: [String: Any] = [
+                        "role": message.role,
+                        "content": message.content,
+                        "id": message.id,
+                        "attachments": message.attachments ?? [] // Always include empty array if nil
+                    ]
+                    return json
+                }
+
+                print("messagesJson: \(messagesJson)")
 
                 let body = [
-                    "messages": [
-                        [
-                            "role": "user",
-                            "content": message,
-                            "attachments": [],
-                            "id": UUID().uuidString
-                        ]
-                    ],
-                    "model": "gemini-2.5-flash",
+                    "messages": messagesJson,
+                    "model": "gemini-2.5-flash", 
                     "modelParams": [
                         "reasoningEffort": "medium",
                         "includeSearch": false
                     ],
                     "threadMetadata": [
-                        "id":  "",
-                        "title": ""
+                        "id": threadId,
+                        "title": title + "\n" // Add newline to match format
                     ],
                     "preferences": [
                         "name": "",
@@ -225,10 +229,13 @@ static func sendMessage(message: String) async -> AsyncThrowingStream<String, Er
                     ]
                 ] as [String: Any]
 
+                print("body: \(body)")
+
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"
                 request.allHTTPHeaderFields = headers
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
 
                 let (data, response) = try await URLSession.shared.data(for: request)
                 
@@ -256,6 +263,7 @@ static func sendMessage(message: String) async -> AsyncThrowingStream<String, Er
                 
                 continuation.finish()
             } catch {
+                print("Error: \(error)")
                 continuation.finish(throwing: error)
             }
         }

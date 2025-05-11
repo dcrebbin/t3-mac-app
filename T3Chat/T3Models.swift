@@ -122,6 +122,29 @@ struct ConversationThread: Codable {
     }
 }
 
+struct ChatMessage: Codable {
+    let role: String
+    let content: String
+    let id: String
+    let attachments: [AnyCodable]?
+
+    init(role: String, content: String, id: String, attachments: [AnyCodable]?) {
+        self.role = role
+        self.content = content
+        self.id = id
+        self.attachments = attachments
+    }
+    
+    func toJson() -> [String: Any] {
+        return [
+            "role": role,
+            "content": content,
+            "id": id,
+            "attachments": attachments
+        ]
+    }
+}
+
 struct ConversationMessage: Codable {
     let id: String
     let role: String

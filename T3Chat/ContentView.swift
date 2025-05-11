@@ -219,6 +219,12 @@ struct ContentView: View {
                 errorReason: ""
               )
               messages.append(newMessage)
+              
+              var chatMessages = filteredMessages.map { ChatMessage(role: $0.role, content: $0.content, id: $0.id, attachments: $0.attachments) }
+              chatMessages.append(ChatMessage(role: "user", content: textInput, id: UUID().uuidString, attachments: nil))
+              let stream = await T3.sendMessage(messages: chatMessages, threadId: threadId, title: thread?.title ?? "")
+              textInput = ""
+              
               let responseMessage = ConversationMessage(
                 id: UUID().uuidString,
                 role: "assistant", 
@@ -232,12 +238,7 @@ struct ContentView: View {
                 providerMetadata: nil,
                 errorReason: ""
               )
-              
               messages.append(responseMessage)
-              
-              let stream = await T3.sendMessage(message: textInput)
-              textInput = ""
-              
               for try await content in stream {
                 print("received content: \(content)")
                 if let index = messages.firstIndex(where: { $0.id == responseMessage.id }) {
