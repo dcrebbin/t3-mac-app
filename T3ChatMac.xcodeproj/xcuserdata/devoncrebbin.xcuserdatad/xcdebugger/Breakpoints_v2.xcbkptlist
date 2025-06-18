@@ -46,10 +46,10 @@
             filePath = "T3Chat/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "355"
-            endingLineNumber = "355"
-            landmarkName = "retrieveChatHistory()"
-            landmarkType = "7">
+            startingLineNumber = "353"
+            endingLineNumber = "353"
+            landmarkName = "body"
+            landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -62,8 +62,8 @@
             filePath = "T3Chat/T3.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "47"
-            endingLineNumber = "47"
+            startingLineNumber = "43"
+            endingLineNumber = "43"
             landmarkName = "T3"
             landmarkType = "14">
          </BreakpointContent>

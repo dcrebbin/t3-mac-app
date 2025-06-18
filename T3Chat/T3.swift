@@ -1,9 +1,5 @@
 import SwiftUI
 
-struct ConversationHistory: Codable {
-  let json: AnyCodable
-}
-
 struct T3Version: Codable {
   let querySet: Int
   let identity: Int
@@ -37,9 +33,9 @@ struct T3QueryModification: Codable {
 
 struct T3HistoryResponse: Codable {
   let type: String
-  let startVersion: T3Version
-  let endVersion: T3Version
-  let modifications: [T3QueryModification]
+  let startVersion: T3Version?
+  let endVersion: T3Version?
+  let modifications: [T3QueryModification]?
 }
 
 struct T3 {
@@ -194,7 +190,7 @@ struct T3 {
                 let t3HistoryResponse = try JSONDecoder().decode(
                   T3HistoryResponse.self, from: text.data(using: .utf8)!)
                 let threads = t3HistoryResponse.modifications.map { modification in
-                  modification.value
+                    modification
                 }
                 print("threads: \(threads)")
 

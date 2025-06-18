@@ -21,6 +21,8 @@ struct ContentView: View {
   @State private var isHoveringClearButton: Bool = false
   @State private var isHoveringRetrieveLatestChatButton: Bool = false
   @State private var selectedThread: ConversationThread?
+  @State private var webSocketManager = WebSocketManager()
+  @State private var textInput: String = ""
 
   func userMessage(message: AppMessage) -> some View {
     let containsChinese =
@@ -139,7 +141,7 @@ struct ContentView: View {
       Text("Clear")
       Button(action: {
         print("Clear conversation")
-        messages = []
+        //        messages = []
         conversationId = ""
         conversationTitle = ""
       }) {
@@ -161,18 +163,72 @@ struct ContentView: View {
     }
   }
 
-  @State public var threads: [ConversationThread] = []
-  @State public var messages: [ConversationMessage] = []
-  @State private var textInput: String = ""
+  var body: some View {
+    ZStack(alignment: .top) {
+      TranslucentView(material: .hudWindow)
+        .edgesIgnoringSafeArea(.all)
+
+      VStack(alignment: .leading, spacing: 0) {
+        TabView {
+          VStack(alignment: .leading) {
+            MessageView(
+              errorText: $errorText,
+              selectedThread: $selectedThread,
+              webSocketManager: webSocketManager
+            )
+            if let errorText = errorText {
+              Text(errorText)
+                .foregroundColor(.red)
+                .padding(.all, 4)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
+            }
+          }
+          .background(Color(.clear))
+          .tabItem {
+            Text("This is a test")
+          }
+          Settings().tabItem {
+            HStack {
+              Text("Settings")
+              Image(systemName: "gearshape")
+                .font(.system(size: 15))
+                .scaledToFit()
+                .padding(.all, 4)
+            }
+          }
+          threadsView
+        }.tabViewStyle(.sidebarAdaptable).frame(maxWidth: .infinity, maxHeight: .infinity)
+          .edgesIgnoringSafeArea(.all).padding(.all, 0)
+      }.onAppear {
+        Task {
+          print("Connecting to web socket")
+          await webSocketManager.connect()
+        }
+      }
+      .frame(maxWidth: .infinity, minHeight: 250, maxHeight: .infinity, alignment: .top)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+  }
+
+  var threadsView: some View {
+    ForEach(webSocketManager.threads, id: \.id) { thread in
+      messagesView(threadId: thread.id).tabItem {
+        Text(thread.title)
+      }.padding(.top, 10)
+        .padding(.horizontal, 10)
+    }
+  }
+
   func messagesView(threadId: String) -> some View {
-    let filteredMessages = messages.filter { $0.threadId == threadId }
+    let filteredMessages = webSocketManager.messages.filter { $0.threadId == threadId }
     let sortedMessages = filteredMessages.sorted {
       if let date0 = $0.created_at, let date1 = $1.created_at {
         return date0 < date1
       }
       return false
     }
-    let thread = threads.first { $0.id == threadId }
+    let thread = webSocketManager.threads.first { $0.id == threadId }
     return VStack(alignment: .leading, spacing: 0) {
       Text(thread?.title ?? "")
         .font(.headline)
@@ -218,7 +274,7 @@ struct ContentView: View {
                   providerMetadata: nil,
                   errorReason: ""
                 )
-                messages.append(newMessage)
+                webSocketManager.messages.append(newMessage)
 
                 var chatMessages = filteredMessages.map {
                   ChatMessage(
@@ -244,11 +300,14 @@ struct ContentView: View {
                   providerMetadata: nil,
                   errorReason: ""
                 )
-                messages.append(responseMessage)
+                webSocketManager.messages.append(responseMessage)
                 for try await content in stream {
                   print("received content: \(content)")
-                  if let index = messages.firstIndex(where: { $0.id == responseMessage.id }) {
-                    messages[index].content = messages[index].content + content
+                  if let index = webSocketManager.messages.firstIndex(where: {
+                    $0.id == responseMessage.id
+                  }) {
+                    webSocketManager.messages[index].content =
+                      webSocketManager.messages[index].content + content
                   }
                 }
               }
@@ -260,102 +319,19 @@ struct ContentView: View {
             .background(
               .ultraThinMaterial
             )
-
             .clipShape(.rect(topLeadingRadius: 10, topTrailingRadius: 10))
-
         }
       }
     }
   }
-
-  var threadsView: some View {
-    ForEach(threads, id: \.id) { thread in
-      messagesView(threadId: thread.id).tabItem {
-        Text(thread.title)
-      }.padding(.top, 10)
-        .padding(.horizontal, 10)
-    }
-  }
-
-  var body: some View {
-    ZStack(alignment: .top) {
-      TranslucentView(material: .hudWindow)
-        .edgesIgnoringSafeArea(.all)
-
-      VStack(alignment: .leading, spacing: 0) {
-        TabView {
-          VStack(alignment: .leading) {
-            MessageView(
-              errorText: $errorText, selectedThread: $selectedThread, threads: $threads,
-              messages: $messages)
-            if let errorText = errorText {
-              Text(errorText)
-                .foregroundColor(.red)
-                .padding(.all, 4)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-            }
-          }
-          .background(Color(.clear))
-          .tabItem {
-            Text("This is a test")
-          }
-          Settings().tabItem {
-            HStack {
-              Text("Settings")
-              Image(systemName: "gearshape")
-                .font(.system(size: 15))
-                .scaledToFit()
-                .padding(.all, 4)
-            }
-          }
-          threadsView
-        }.tabViewStyle(.sidebarAdaptable).frame(maxWidth: .infinity, maxHeight: .infinity)
-          .edgesIgnoringSafeArea(.all).padding(.all, 0)
-      }.onAppear {
-        if ApplicationState.conversationThreads.count > 0
-          && ApplicationState.conversationMessages.count > 0 && threads.count == 0
-          && messages.count == 0
-        {
-          print("ApplicationState.conversationThreads: \(ApplicationState.conversationThreads)")
-          print("ApplicationState.conversationMessages: \(ApplicationState.conversationMessages)")
-          let threadsData = Data(base64Encoded: ApplicationState.conversationThreads)
-          let messagesData = Data(base64Encoded: ApplicationState.conversationMessages)
-          let decoder = JSONDecoder()
-          decoder.dateDecodingStrategy = .iso8601
-          threads = try! decoder.decode([ConversationThread].self, from: threadsData ?? Data())
-          messages = try! decoder.decode([ConversationMessage].self, from: messagesData ?? Data())
-        }
-      }
-      .frame(maxWidth: .infinity, minHeight: 250, maxHeight: .infinity, alignment: .top)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-  }
-}
-
-#Preview {
-  ContentView()
 }
 
 struct MessageView: View {
   @Binding var errorText: String?
-
   @State var isRetrievingChatHistory: Bool = false
   @State var isHoveringRetrieveLatestChatButton: Bool = false
   @Binding var selectedThread: ConversationThread?
-  @Binding var threads: [ConversationThread]
-  @Binding var messages: [ConversationMessage]
-
-  func retrieveChatHistory() async {
-    print("Retrieving chat history")
-    isRetrievingChatHistory = true
-    if let result = await T3.retrieveChatHistory() {
-      threads = result.threads
-      messages = result.messages
-      print("Found \(threads.count) threads and \(messages.count) messages")
-    }
-    isRetrievingChatHistory = false
-  }
+  let webSocketManager: WebSocketManager
 
   var body: some View {
     VStack {
@@ -364,7 +340,9 @@ struct MessageView: View {
         Button(action: {
           Task {
             if !isRetrievingChatHistory {
-              await retrieveChatHistory()
+              isRetrievingChatHistory = true
+              await webSocketManager.connect()
+              isRetrievingChatHistory = false
             }
           }
         }) {
@@ -398,4 +376,8 @@ struct MessageView: View {
       .frame(maxWidth: .infinity, minHeight: 60)
     }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
+}
+
+#Preview {
+  ContentView()
 }

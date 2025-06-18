@@ -69,7 +69,7 @@ struct ConversationThread: Codable {
     {
       self.id = id
     } else {
-      id = try container.decode(String.self, forKey: .id)
+      self.id = try container.decode(String.self, forKey: .id)
     }
 
     if let modelValue = try? container.decode(AnyCodable.self, forKey: .model),
@@ -77,7 +77,7 @@ struct ConversationThread: Codable {
     {
       self.model = model
     } else {
-      model = try container.decode(String.self, forKey: .model)
+      self.model = try container.decode(String.self, forKey: .model)
     }
 
     if let titleValue = try? container.decode(AnyCodable.self, forKey: .title),
@@ -85,7 +85,7 @@ struct ConversationThread: Codable {
     {
       self.title = title
     } else {
-      title = try container.decode(String.self, forKey: .title)
+      self.title = try container.decode(String.self, forKey: .title)
     }
 
     if let statusValue = try? container.decode(AnyCodable.self, forKey: .status),
@@ -93,7 +93,7 @@ struct ConversationThread: Codable {
     {
       self.status = status
     } else {
-      status = try container.decode(String.self, forKey: .status)
+      self.status = try container.decode(String.self, forKey: .status)
     }
 
     if let createdValue = try? container.decode(AnyCodable.self, forKey: .created_at),
@@ -101,7 +101,7 @@ struct ConversationThread: Codable {
     {
       self.created_at = created
     } else {
-      created_at = try container.decode(String.self, forKey: .created_at)
+      self.created_at = try container.decode(String.self, forKey: .created_at)
     }
 
     if let updatedValue = try? container.decode(AnyCodable.self, forKey: .updated_at),
@@ -109,7 +109,7 @@ struct ConversationThread: Codable {
     {
       self.updated_at = updated
     } else {
-      updated_at = try container.decodeIfPresent(String.self, forKey: .updated_at)
+      self.updated_at = try container.decodeIfPresent(String.self, forKey: .updated_at)
     }
 
     if let lastMessageValue = try? container.decode(AnyCodable.self, forKey: .last_message_at),
@@ -117,7 +117,7 @@ struct ConversationThread: Codable {
     {
       self.last_message_at = lastMessage
     } else {
-      last_message_at = try container.decodeIfPresent(String.self, forKey: .last_message_at)
+      self.last_message_at = try container.decodeIfPresent(String.self, forKey: .last_message_at)
     }
 
     if let editedValue = try? container.decode(AnyCodable.self, forKey: .user_edited_title),
@@ -125,8 +125,22 @@ struct ConversationThread: Codable {
     {
       self.user_edited_title = edited
     } else {
-      user_edited_title = try container.decodeIfPresent(Bool.self, forKey: .user_edited_title)
+      self.user_edited_title = try container.decodeIfPresent(Bool.self, forKey: .user_edited_title)
     }
+  }
+
+  init(
+    id: String, model: String, title: String, status: String, created_at: String,
+    updated_at: String?, last_message_at: String?, user_edited_title: Bool?
+  ) {
+    self.id = id
+    self.model = model
+    self.title = title
+    self.status = status
+    self.created_at = created_at
+    self.updated_at = updated_at
+    self.last_message_at = last_message_at
+    self.user_edited_title = user_edited_title
   }
 }
 
