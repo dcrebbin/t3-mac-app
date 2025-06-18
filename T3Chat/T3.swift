@@ -2,8 +2,6 @@ import SwiftUI
 
 struct T3 {
 
-/// Extracts all ConversationThread objects and ConversationMessage objects from an array of ConversationHistory.
-/// Returns a tuple containing arrays of ConversationThread and ConversationMessage, or nil if none found.
 func getConversationThreads(from histories: [ConversationHistory]) -> (threads: [ConversationThread], messages: [ConversationMessage])? {
     var retrievedThreads: [ConversationThread] = []
     var retrievedMessages: [ConversationMessage] = []
@@ -11,19 +9,16 @@ func getConversationThreads(from histories: [ConversationHistory]) -> (threads: 
     for history in histories {
         switch history.json {
         case .dict(let dict):
-            // Process dictionary case
             for (_, value) in dict {
                 for array in value {
                     for item in array {
                             
                             print("Attempting \(item)")
-                            // Try to decode as a thread
                             if let jsonData = try? JSONSerialization.data(withJSONObject: dict),
                                let thread = try? JSONDecoder().decode(ConversationThread.self, from: jsonData) {
                                 retrievedThreads.append(thread)
                             }
                             
-                            // Try to decode as a message
                             if let jsonData = try? JSONSerialization.data(withJSONObject: dict),
                                let message = try? JSONDecoder().decode(ConversationMessage.self, from: jsonData) {
                                 retrievedMessages.append(message)

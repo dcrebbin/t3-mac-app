@@ -165,109 +165,115 @@ struct ContentView: View {
   @State public var messages: [ConversationMessage] = []
   @State private var textInput: String = ""
   func messagesView(threadId: String) -> some View {
-      let filteredMessages = messages.filter { $0.threadId == threadId }
-      let sortedMessages = filteredMessages.sorted {
-          if let date0 = $0.created_at, let date1 = $1.created_at {
-          return date0 < date1
-        }
-        return false
+    let filteredMessages = messages.filter { $0.threadId == threadId }
+    let sortedMessages = filteredMessages.sorted {
+      if let date0 = $0.created_at, let date1 = $1.created_at {
+        return date0 < date1
       }
-      let thread = threads.first { $0.id == threadId }
-      return VStack(alignment: .leading, spacing: 0) {
-        Text(thread?.title ?? "")
-          .font(.headline)
-          .padding(.bottom, 10)
+      return false
+    }
+    let thread = threads.first { $0.id == threadId }
+    return VStack(alignment: .leading, spacing: 0) {
+      Text(thread?.title ?? "")
+        .font(.headline)
+        .padding(.bottom, 10)
       ZStack(alignment: .bottom) {
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-              ForEach(sortedMessages, id: \.id) { message in
-                if message.role == "user" {
-                  VStack(alignment: .trailing) {
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(sortedMessages, id: \.id) { message in
+              if message.role == "user" {
+                VStack(alignment: .trailing) {
                   Text(.init(Constants.convertStringToMarkdown(message: message.content)))
                     .font(.body)
                     .textSelection(.enabled)
                     .padding(.all, 10)
                     .background(Color.gray.opacity(0.2))
                     .cornerRadius(10)
-                  }.frame(maxWidth: .infinity, alignment: .trailing).padding(.bottom, 10)
-                } else {
-                  Text(.init(Constants.convertStringToMarkdown(message: message.content)))
-                    .font(.body)
-                    .padding(.top, 10)
-                    .textSelection(.enabled)
-                }
-              }
-          }
-        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        ZStack (alignment: .bottom) {
-        TextField("",text: $textInput)
-          .onSubmit {
-            Task {
-              print("newMessage: \(textInput)")
-             
-              let newMessage = ConversationMessage(
-                id: UUID().uuidString,
-                role: "user",
-                model: "gemini-2.5-flash",
-                status: threadId,
-                content: textInput,
-                threadId: threadId,
-                created_at: Date().ISO8601Format(),
-                modelParams: ["reasoningEffort": "medium"],
-                attachments: nil,
-                providerMetadata: nil,
-                errorReason: ""
-              )
-              messages.append(newMessage)
-              
-              var chatMessages = filteredMessages.map { ChatMessage(role: $0.role, content: $0.content, id: $0.id, attachments: $0.attachments) }
-              chatMessages.append(ChatMessage(role: "user", content: textInput, id: UUID().uuidString, attachments: nil))
-              let stream = await T3.sendMessage(messages: chatMessages, threadId: threadId, title: thread?.title ?? "")
-              textInput = ""
-              
-              let responseMessage = ConversationMessage(
-                id: UUID().uuidString,
-                role: "assistant", 
-                model: "gemini-2.5-flash",
-                status: threadId,
-                content: "",
-                threadId: threadId,
-                created_at: Date().ISO8601Format(),
-                modelParams: ["reasoningEffort": "medium"],
-                attachments: nil,
-                providerMetadata: nil,
-                errorReason: ""
-              )
-              messages.append(responseMessage)
-              for try await content in stream {
-                print("received content: \(content)")
-                if let index = messages.firstIndex(where: { $0.id == responseMessage.id }) {
-                  messages[index].content = messages[index].content + content
-                }
+                }.frame(maxWidth: .infinity, alignment: .trailing).padding(.bottom, 10)
+              } else {
+                Text(.init(Constants.convertStringToMarkdown(message: message.content)))
+                  .font(.body)
+                  .padding(.top, 10)
+                  .textSelection(.enabled)
               }
             }
           }
-          .padding(.horizontal, 10)
-          .frame(height:60)
-          .textFieldStyle(PlainTextFieldStyle())
-          .border(Color.white.opacity(0.2), width: 1)
-          .background(
-            .ultraThinMaterial
-          )
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        ZStack(alignment: .bottom) {
+          TextField("", text: $textInput)
+            .onSubmit {
+              Task {
+                print("newMessage: \(textInput)")
 
-          .clipShape(.rect(topLeadingRadius: 10, topTrailingRadius: 10))
+                let newMessage = ConversationMessage(
+                  id: UUID().uuidString,
+                  role: "user",
+                  model: "gemini-2.5-flash",
+                  status: threadId,
+                  content: textInput,
+                  threadId: threadId,
+                  created_at: Date().ISO8601Format(),
+                  modelParams: ["reasoningEffort": "medium"],
+                  attachments: nil,
+                  providerMetadata: nil,
+                  errorReason: ""
+                )
+                messages.append(newMessage)
 
-      }
+                var chatMessages = filteredMessages.map {
+                  ChatMessage(
+                    role: $0.role, content: $0.content, id: $0.id, attachments: $0.attachments)
+                }
+                chatMessages.append(
+                  ChatMessage(
+                    role: "user", content: textInput, id: UUID().uuidString, attachments: nil))
+                let stream = await T3.sendMessage(
+                  messages: chatMessages, threadId: threadId, title: thread?.title ?? "")
+                textInput = ""
+
+                let responseMessage = ConversationMessage(
+                  id: UUID().uuidString,
+                  role: "assistant",
+                  model: "gemini-2.5-flash",
+                  status: threadId,
+                  content: "",
+                  threadId: threadId,
+                  created_at: Date().ISO8601Format(),
+                  modelParams: ["reasoningEffort": "medium"],
+                  attachments: nil,
+                  providerMetadata: nil,
+                  errorReason: ""
+                )
+                messages.append(responseMessage)
+                for try await content in stream {
+                  print("received content: \(content)")
+                  if let index = messages.firstIndex(where: { $0.id == responseMessage.id }) {
+                    messages[index].content = messages[index].content + content
+                  }
+                }
+              }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 60)
+            .textFieldStyle(PlainTextFieldStyle())
+            .border(Color.white.opacity(0.2), width: 1)
+            .background(
+              .ultraThinMaterial
+            )
+
+            .clipShape(.rect(topLeadingRadius: 10, topTrailingRadius: 10))
+
         }
       }
+    }
   }
-  
+
   var threadsView: some View {
     ForEach(threads, id: \.id) { thread in
       messagesView(threadId: thread.id).tabItem {
         Text(thread.title)
       }.padding(.top, 10)
-      .padding(.horizontal, 10)
+        .padding(.horizontal, 10)
     }
   }
 
@@ -278,8 +284,10 @@ struct ContentView: View {
 
       VStack(alignment: .leading, spacing: 0) {
         TabView {
-            VStack(alignment: .leading) {
-            MessageView(errorText: $errorText, selectedThread: $selectedThread, threads: $threads, messages: $messages)
+          VStack(alignment: .leading) {
+            MessageView(
+              errorText: $errorText, selectedThread: $selectedThread, threads: $threads,
+              messages: $messages)
             if let errorText = errorText {
               Text(errorText)
                 .foregroundColor(.red)
@@ -292,11 +300,23 @@ struct ContentView: View {
           .tabItem {
             Text("This is a test")
           }
+          Settings().tabItem {
+            HStack {
+              Text("Settings")
+              Image(systemName: "gearshape")
+                .font(.system(size: 15))
+                .scaledToFit()
+                .padding(.all, 4)
+            }
+          }
           threadsView
         }.tabViewStyle(.sidebarAdaptable).frame(maxWidth: .infinity, maxHeight: .infinity)
           .edgesIgnoringSafeArea(.all).padding(.all, 0)
       }.onAppear {
-        if ApplicationState.conversationThreads.count > 0 && ApplicationState.conversationMessages.count > 0 && threads.count == 0 && messages.count == 0 {
+        if ApplicationState.conversationThreads.count > 0
+          && ApplicationState.conversationMessages.count > 0 && threads.count == 0
+          && messages.count == 0
+        {
           print("ApplicationState.conversationThreads: \(ApplicationState.conversationThreads)")
           print("ApplicationState.conversationMessages: \(ApplicationState.conversationMessages)")
           let threadsData = Data(base64Encoded: ApplicationState.conversationThreads)
@@ -307,9 +327,9 @@ struct ContentView: View {
           messages = try! decoder.decode([ConversationMessage].self, from: messagesData ?? Data())
         }
       }
-      .frame(maxWidth: .infinity, minHeight: 250, maxHeight: .infinity,alignment: .top)
+      .frame(maxWidth: .infinity, minHeight: 250, maxHeight: .infinity, alignment: .top)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity,alignment: .top)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 }
 
@@ -349,16 +369,15 @@ struct MessageView: View {
           }
         }) {
           Image(
-            systemName:"arrow.clockwise"
+            systemName: "arrow.clockwise"
           )
           .font(.system(size: 15))
           .scaledToFit()
           .padding(.all, 4)
           .rotationEffect(.degrees(isRetrievingChatHistory ? 360 : 0))
           .animation(
-            isRetrievingChatHistory ? 
-              Animation.linear(duration: 1).repeatForever(autoreverses: false) : 
-              .default,
+            isRetrievingChatHistory
+              ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default,
             value: isRetrievingChatHistory
           )
         }
